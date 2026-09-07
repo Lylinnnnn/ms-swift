@@ -8,19 +8,21 @@ from transformers.trainer_callback import (DefaultFlowCallback, PrinterCallback,
                                            TrainerState)
 from transformers.trainer_utils import IntervalStrategy, has_length
 
-from swift.utils import append_to_jsonl, format_time, get_logger, get_max_reserved_memory, is_pai_training_job
+from swift.utils import append_to_jsonl, get_logger, get_max_reserved_memory, is_pai_training_job
 from .arguments import TrainingArguments
 
 logger = get_logger()
 
 
 def add_train_message(logs, state, start_time, start_step) -> None:
-    logs['global_step/max_steps'] = f'{state.global_step}/{state.max_steps}'
+    # Trainer integrations such as SwanLab accept numeric scalars, not formatted
+    # progress/time strings. Human-readable progress is already rendered by tqdm.
+    logs['global_step/max_steps'] = round(state.global_step / max(1, state.max_steps), 8)
     elapsed = time.time() - start_time
-    logs['elapsed_time'] = format_time(elapsed)
+    logs['elapsed_time'] = round(elapsed, 3)
     n_steps = state.global_step - start_step
     train_speed = elapsed / n_steps if n_steps > 0 else 0.0
-    logs['remaining_time'] = format_time((state.max_steps - state.global_step) * train_speed)
+    logs['remaining_time'] = round((state.max_steps - state.global_step) * train_speed, 3)
     for k, v in logs.items():
         if isinstance(v, float):
             logs[k] = round(logs[k], 8)
